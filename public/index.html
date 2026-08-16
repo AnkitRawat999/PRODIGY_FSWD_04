@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PulseChat - Real-Time WebSocket Messaging</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Feather Icons for Clean Modern SVG Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+</head>
+<body>
+
+  <!-- Auth Modal Overlay -->
+  <div id="auth-modal" class="auth-overlay">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>PulseChat</h1>
+        <p>Real-time WebSocket Instant Messaging</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button id="tab-login" class="auth-tab-btn active" onclick="switchAuthTab('login')">Log In</button>
+        <button id="tab-register" class="auth-tab-btn" onclick="switchAuthTab('register')">Sign Up</button>
+      </div>
+
+      <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+        <div class="form-group">
+          <label for="input-username">Username</label>
+          <input type="text" id="input-username" class="form-control" placeholder="e.g. alex_dev" required autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label for="input-password">Password</label>
+          <input type="password" id="input-password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+
+        <div id="register-fields" style="display: none;">
+          <div class="form-group">
+            <label for="input-displayname">Display Name</label>
+            <input type="text" id="input-displayname" class="form-control" placeholder="Alex Rivera">
+          </div>
+
+          <div class="form-group">
+            <label>Avatar Accent</label>
+            <div class="avatar-selector">
+              <div class="color-option selected" data-color="#6366f1" style="background: #6366f1;" onclick="selectAvatarColor('#6366f1')"></div>
+              <div class="color-option" data-color="#8b5cf6" style="background: #8b5cf6;" onclick="selectAvatarColor('#8b5cf6')"></div>
+              <div class="color-option" data-color="#06b6d4" style="background: #06b6d4;" onclick="selectAvatarColor('#06b6d4')"></div>
+              <div class="color-option" data-color="#10b981" style="background: #10b981;" onclick="selectAvatarColor('#10b981')"></div>
+              <div class="color-option" data-color="#ec4899" style="background: #ec4899;" onclick="selectAvatarColor('#ec4899')"></div>
+              <div class="color-option" data-color="#f59e0b" style="background: #f59e0b;" onclick="selectAvatarColor('#f59e0b')"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="auth-error" class="error-message"></div>
+
+        <button type="submit" id="auth-submit-btn" class="btn-primary">Log In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- App Main Layout -->
+  <div id="app-container" style="display: none;">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="app-title">
+          <i data-feather="zap"></i>
+          <span>PulseChat</span>
+        </div>
+        <div class="header-actions">
+          <button id="btn-sound" class="icon-btn active" title="Toggle Sound" onclick="toggleSound()">
+            <i data-feather="volume-2"></i>
+          </button>
+          <button id="btn-notify" class="icon-btn" title="Enable Push Notifications" onclick="toggleNotifications()">
+            <i data-feather="bell"></i>
+          </button>
+          <button class="icon-btn" title="Logout" onclick="logout()">
+            <i data-feather="log-out"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Current User Profile Bar -->
+      <div class="user-profile-bar">
+        <div id="current-user-avatar" class="avatar">
+          ?
+          <span id="current-user-status-dot" class="status-dot online"></span>
+        </div>
+        <div class="user-details">
+          <div id="current-user-name" class="name">User</div>
+          <div id="current-user-handle" class="username-handle">@username</div>
+        </div>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="sidebar-search">
+        <input type="text" id="search-input" placeholder="Search channels & users..." oninput="filterSidebarItems()">
+      </div>
+
+      <!-- Navigation Lists -->
+      <div class="nav-sections">
+        <!-- Rooms Section -->
+        <div class="section-header">
+          <span>Chat Channels</span>
+          <button class="add-room-btn" title="Create Room" onclick="openCreateRoomModal()">+</button>
+        </div>
+        <div id="rooms-list"></div>
+
+        <!-- Direct Messages Section -->
+        <div class="section-header" style="margin-top: 16px;">
+          <span>Direct Messages</span>
+        </div>
+        <div id="users-list"></div>
+      </div>
+    </aside>
+
+    <!-- Main Chat Workspace -->
+    <main class="chat-main">
+      <!-- Chat Header -->
+      <header class="chat-header">
+        <div class="chat-title-group">
+          <div id="chat-header-avatar" class="avatar" style="display: none;"></div>
+          <div>
+            <h2 id="chat-header-title">Select a Conversation</h2>
+            <div id="chat-header-sub" class="chat-subtext">Choose a channel or user to start messaging</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Message Feed -->
+      <div id="message-feed" class="message-feed">
+        <div class="empty-chat">
+          <i data-feather="message-square"></i>
+          <h3>Welcome to PulseChat</h3>
+          <p>Select a channel or team member from the sidebar to start instant messaging in real-time.</p>
+        </div>
+      </div>
+
+      <!-- Real-Time Typing Indicator Bar -->
+      <div id="typing-bar" class="typing-indicator" style="visibility: hidden;">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <span id="typing-text">Someone is typing...</span>
+      </div>
+
+      <!-- Chat Input Area -->
+      <div class="chat-input-area">
+        <!-- File Upload Preview Bar -->
+        <div id="file-preview-bar" class="preview-file-bar" style="display: none;">
+          <span id="preview-filename">file.png</span>
+          <button class="icon-btn" onclick="clearSelectedFile()"><i data-feather="x"></i></button>
+        </div>
+
+        <div class="input-wrapper">
+          <input type="file" id="file-input" style="display: none;" onchange="handleFileSelected(event)">
+          
+          <button class="icon-btn" title="Attach Multimedia File" onclick="document.getElementById('file-input').click()">
+            <i data-feather="paperclip"></i>
+          </button>
+          
+          <button id="voice-record-btn" class="icon-btn" title="Record Voice Note" onclick="toggleVoiceRecording()">
+            <i data-feather="mic"></i>
+          </button>
+
+          <input type="text" id="message-input" placeholder="Type your message..." oninput="handleTypingEvent()" onkeydown="handleInputKeydown(event)">
+
+          <div class="input-actions">
+            <button class="btn-send" title="Send Message" onclick="sendMessage()">
+              <i data-feather="send"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Create Room Modal -->
+  <div id="create-room-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Create New Channel</h3>
+        <button class="icon-btn" onclick="closeCreateRoomModal()"><i data-feather="x"></i></button>
+      </div>
+      <div class="form-group">
+        <label for="new-room-name">Channel Name</label>
+        <input type="text" id="new-room-name" class="form-control" placeholder="e.g. dev-team">
+      </div>
+      <div class="form-group">
+        <label for="new-room-desc">Description</label>
+        <input type="text" id="new-room-desc" class="form-control" placeholder="Channel topic or purpose">
+      </div>
+      <button class="btn-primary" onclick="submitCreateRoom()">Create Channel</button>
+    </div>
+  </div>
+
+  <!-- Lightbox Modal for Images -->
+  <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+    <img id="lightbox-img" src="" alt="Full view preview">
+  </div>
+
+  <script src="js/audio.js"></script>
+  <script src="js/socket.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    feather.replace();
+  </script>
+</body>
+</html>
